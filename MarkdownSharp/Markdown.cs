@@ -86,6 +86,7 @@ software, even if advised of the possibility of such damage.
 using System;
 using System.Collections.Generic;
 using System.Configuration;
+using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -123,6 +124,11 @@ namespace MarkdownSharp
         /// WARNING: this is a significant deviation from the markdown spec
         /// </summary>
         public bool StrictBoldItalic { get; set; }
+        /// <summary>
+        /// it defines code class for hightlight library such as prettify.
+        /// example:  class="prettyprint"
+        /// </summary>
+        public string CodeClass { get; set; }
     }
 
 
@@ -134,6 +140,8 @@ namespace MarkdownSharp
     public class Markdown
     {
         private const string _version = "1.13";
+        private string _precode;
+        private string _code;
 
         #region Constructors and Options
 
@@ -142,6 +150,7 @@ namespace MarkdownSharp
         /// </summary>
         public Markdown() : this(false)
         {
+            initCodeClass();
         }
 
         /// <summary>
@@ -183,8 +192,12 @@ namespace MarkdownSharp
                     case "Markdown.StrictBoldItalic":
                         _strictBoldItalic = Convert.ToBoolean(settings[key]);
                         break;
+                    case "Markdown.CodeClass":
+                        _codeClass = settings[key];
+                        break;
                 }
             }
+            initCodeClass();
         }
 
         /// <summary>
@@ -198,6 +211,14 @@ namespace MarkdownSharp
             _encodeProblemUrlCharacters = options.EncodeProblemUrlCharacters;
             _linkEmails = options.LinkEmails;
             _strictBoldItalic = options.StrictBoldItalic;
+            _codeClass = options.CodeClass;
+            initCodeClass();
+        }
+
+        private void initCodeClass()
+        {
+            _precode = String.Format("\n\n<pre{0}><code>", _codeClass);
+            _code = String.Format("<code{0}>", _codeClass);
         }
 
 
@@ -265,6 +286,21 @@ namespace MarkdownSharp
             set { _encodeProblemUrlCharacters = value; }
         }
         private bool _encodeProblemUrlCharacters = false;
+
+        /// <summary>
+        /// it defines code class for hightlight library such as prettify.
+        /// example:  class="prettyprint"
+        /// </summary>
+        public string CodeClass
+        {
+            get { return _codeClass; }
+            set
+            {
+                _codeClass = value;
+                initCodeClass();
+            }
+        }
+        private string _codeClass = "";
 
         #endregion
 
@@ -378,6 +414,7 @@ namespace MarkdownSharp
             text = DoHorizontalRules(text);
             text = DoLists(text);
             text = DoCodeBlocks(text);
+            text = DoCodeBlocks2(text);
             text = DoBlockQuotes(text);
 
             // We already ran HashHTMLBlocks() before, in Markdown(), but that
@@ -1268,7 +1305,35 @@ namespace MarkdownSharp
             codeBlock = EncodeCode(Outdent(codeBlock));
             codeBlock = _newlinesLeadingTrailing.Replace(codeBlock, "");
 
-            return string.Concat("\n\n<pre><code>", codeBlock, "\n</code></pre>\n\n");
+            return string.Concat(_precode, codeBlock, "\n</code></pre>\n\n");
+        }
+
+        /// <summary>
+        /// /// Turn Markdown ``` indented code into HTML pre code blocks
+        /// </summary>
+        private string DoCodeBlocks2(string text)
+        {
+            bool inCode = false;
+            var sb = new StringBuilder();
+            using(var r = new StringReader(text))
+            {
+                string line;
+                while((line = r.ReadLine()) != null)
+                {
+                    if (line.StartsWith("```"))
+                    {
+                        inCode = !inCode;
+                        sb.Append(inCode ? _precode : "</code></pre>");
+                        if (!inCode) { sb.Append("\n"); }
+                    }
+                    else
+                    {
+                        sb.Append(inCode ? EncodeCode(line) : line);
+                        sb.Append("\n");
+                    }
+                }
+            }
+            return sb.ToString();
         }
 
         private static Regex _codeSpan = new Regex(@"
@@ -1316,7 +1381,7 @@ namespace MarkdownSharp
             span = Regex.Replace(span, @"[ ]*$", ""); // trailing whitespace
             span = EncodeCode(span);
 
-            return string.Concat("<code>", span, "</code>");
+            return string.Concat(_code, span, "</code>");
         }
 
 

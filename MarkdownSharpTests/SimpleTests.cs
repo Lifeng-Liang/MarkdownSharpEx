@@ -166,6 +166,34 @@ namespace MarkdownSharpTests
         }
 
         [Test]
+        public void CodeBlock2()
+        {
+            string input = @"code sample:
+
+```
+function fib(x) {
+	if(x <= 0) { throw new Error(""Argument Error""); }
+	if(x <= 2) { return 1; }
+	return fib(x-2)+fib(x-1);
+}
+```".Replace("\r\n", "\n");
+            string expected = @"<p>code sample:</p>
+
+<pre><code>
+function fib(x) {
+    if(x &lt;= 0) { throw new Error(""Argument Error""); }
+    if(x &lt;= 2) { return 1; }
+    return fib(x-2)+fib(x-1);
+}
+</code></pre>
+".Replace("\r\n", "\n");
+
+            string actual = m.Transform(input);
+
+            Assert.AreEqual(expected, actual);
+        }
+
+        [Test]
         public void CodeSpan()
         {
             string input = "HTML contains the `<blink>` tag";
